@@ -1,4 +1,4 @@
-# deepdocs.yml
+---
 targets:
   - path: "docs/" 
 

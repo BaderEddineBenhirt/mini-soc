@@ -36,7 +36,6 @@
         name: "{{ config_traefik_dynamic }}"
         state: absent
       become: true
-
     # Keep volumes by default to preserve data;
     # - name: Remove volumes (DANGEROUS: data loss)
     #   community.docker.docker_volume:

@@ -1,3 +1,4 @@
+---
 name: mini-soc-cicd
 
 on:
@@ -77,9 +78,9 @@ jobs:
     name: Selenium UI test (HTTPS + login form)
     runs-on: ubuntu-latest
     env:
-      TEST_URL: ${{ secrets.TEST_URL }}            # e.g., https://wazuh.example.com
-      TEST_USER: ${{ secrets.TEST_USER }}          # optional if you extend test to login
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}  # optional if you extend test to login
+      TEST_URL: ${{ secrets.TEST_URL }}           
+      TEST_USER: ${{ secrets.TEST_USER }}         
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}  
     steps:
       - uses: actions/checkout@v4
       - name: Setup Python

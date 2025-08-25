@@ -1,3 +1,4 @@
+---
 version: "3.9"
 
 x-common-deploy: &common-deploy
@@ -97,7 +98,6 @@ services:
   wazuh-indexer:
     image: wazuh/wazuh-indexer:4.7.2
     environment:
-      # Use a small wrapper to export secret -> env then start the service
       - "OPENSEARCH_INITIAL_ADMIN_PASSWORD_FILE=/run/secrets/wazuh_indexer_password"
       - "DISABLE_INSTALL_DEMO_CONFIG=true"
     command: >
@@ -166,7 +166,6 @@ services:
       - back_net
 
   wazuh-dashboard:
-    # You may use the extended image to satisfy "build" step, or upstream:
     image: wazuh/wazuh-dashboard:4.7.2
     environment:
       - "OPENSEARCH_URL=https://wazuh-indexer:9200"

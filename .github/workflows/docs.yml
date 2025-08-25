@@ -1,34 +1,40 @@
-# .github/workflows/docs.yml
+---
 name: docs
 on:
   push:
-    branches: [main]
+    branches: ["main"]
     paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
-      - 'ansible/**'
-      - '.github/workflows/**'
+      - "docs/**"
+      - "mkdocs.yml"
+      - "ansible/**"
+      - ".github/workflows/**"
 permissions:
   contents: write
+
 jobs:
   build-publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Python
+
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+
       - name: Install MkDocs + plugins
         run: |
           pip install mkdocs-material mkdocs-mermaid2-plugin mkdocs-git-revision-date-localized-plugin
-      - name: Generate role docs (example)
+
+      - name: (Optional) Generate role docs
         run: |
           mkdir -p docs/refs
-          ansible-galaxy collection install community.docker
+          ansible-galaxy collection install community.docker || true
           ansible-doc -t role wazuh_stack > docs/refs/role_wazuh_stack.md || true
+
       - name: Build site
         run: mkdocs build --strict
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v3
         with:
