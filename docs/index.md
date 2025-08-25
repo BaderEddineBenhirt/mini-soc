@@ -1,6 +1,6 @@
 # Mini SOC Documentation
 
-Welcome to the documentation for the Mini SOC project.
+Welcome! This site documents the Mini SOC project (Wazuh on Docker Swarm, Traefik, Ansible, CI/CD).
 
 - [Architecture](architecture.md)
 - [How to Run](usage.md)

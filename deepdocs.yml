@@ -1,12 +1,14 @@
+
 ---
-targets:
-  - path: "docs/" 
 
-branches:
-  - main
-
-ignore:
-  - "docs/_build/**"
-  - ".github/**"
-
-reinit: "v1"
+### `deepdocs.yml`
+```yaml
+---
+# Minimal DeepDocs config: keep docs and README in sync via PRs
+target:
+  - url: "docs/"
+  - url: "README.md"
+include: []
+ignore: []
+# bump this string to force a full re-scan if needed
+reinit: "bootstrap-001"

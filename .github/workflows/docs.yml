@@ -6,7 +6,6 @@ on:
     paths:
       - "docs/**"
       - "mkdocs.yml"
-      - "ansible/**"
       - ".github/workflows/**"
 permissions:
   contents: write
@@ -25,12 +24,6 @@ jobs:
       - name: Install MkDocs + plugins
         run: |
           pip install mkdocs-material mkdocs-mermaid2-plugin mkdocs-git-revision-date-localized-plugin
-
-      - name: (Optional) Generate role docs
-        run: |
-          mkdir -p docs/refs
-          ansible-galaxy collection install community.docker || true
-          ansible-doc -t role wazuh_stack > docs/refs/role_wazuh_stack.md || true
 
       - name: Build site
         run: mkdocs build --strict
