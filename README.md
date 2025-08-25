@@ -7,15 +7,16 @@ A production-ready, reproducible Mini SOC implementing **Wazuh** (Indexer, Manag
 ## Architecture Overview
 
 ```mermaid
-flowchart LR
-  Dev[Developer / PR] -->|push/PR| GH[GitHub Actions]
-  GH -->|lint, build, Trivy, Selenium| Gates[Quality Gates]
-  Gates -->|main only| SH[Self-Hosted Runner]
-  SH -->|Ansible| Swarm[Docker Swarm Manager]
-  Swarm --> Traefik[Traefik]
-  Swarm --> Indexer[Wazuh Indexer (OpenSearch)]
-  Swarm --> Manager[Wazuh Manager (API 55000)]
-  Swarm --> Dashboard[Wazuh Dashboard]
+graph LR
+  Dev["Developer / PR"] -->|push/PR| GH["GitHub Actions"]
+  GH -->|lint, build, Trivy, Selenium| Gates["Quality Gates"]
+  Gates -->|main only| Runner["Self-Hosted Runner"]
+  Runner -->|Ansible| Swarm["Docker Swarm Manager"]
+  Swarm --> Traefik["Traefik"]
+  Swarm --> Indexer["Wazuh Indexer (OpenSearch)"]
+  Swarm --> Manager["Wazuh Manager (API 55000)"]
+  Swarm --> Dashboard["Wazuh Dashboard"]
   Traefik -->|HTTP/HTTPS| Dashboard
   Manager --> Indexer
-  Agents[(Wazuh Agents)] --> Manager
+  Agents[("Wazuh Agents")] --> Manager
+
