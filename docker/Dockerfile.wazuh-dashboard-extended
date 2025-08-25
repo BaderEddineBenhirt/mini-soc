@@ -1,0 +1,6 @@
+FROM wazuh/wazuh-dashboard:4.7.2
+
+LABEL org.opencontainers.image.title="wazuh-dashboard-extended" \
+      org.opencontainers.image.description="Extended Wazuh dashboard image for CI build demonstration" \
+      org.opencontainers.image.version="4.7.2" \
+      maintainer="SOC Architect"

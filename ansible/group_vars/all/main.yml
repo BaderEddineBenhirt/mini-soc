@@ -1,0 +1,28 @@
+
+project_name: wazuh
+
+wazuh_domain: "wazuh.example.com"
+
+frontend_net: "front_net"
+backend_net: "back_net"
+
+vol_indexer_data: "wazuh_indexer_data"
+vol_manager_data: "wazuh_manager_data"
+vol_traefik_letsencrypt: "traefik_letsencrypt"
+
+secret_indexer_password: "wazuh_indexer_password"
+secret_api_password: "wazuh_api_password"
+secret_dashboard_password: "wazuh_dashboard_password"
+secret_acme_email: "traefik_acme_email"
+
+config_traefik_dynamic: "traefik_dynamic.yml"
+
+wazuh_version: "4.7.2"
+traefik_version: "2.11.2"
+
+stack_file: "{{ playbook_dir }}/../stack/wazuh-stack.yml"
+
+indexer_memory_limit: "2G"
+manager_memory_limit: "2G"
+dashboard_memory_limit: "1G"
+traefik_memory_limit: "512M"

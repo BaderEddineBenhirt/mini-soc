@@ -1,0 +1,10 @@
+---
+- name: Deploy Wazuh mini SOC to Docker Swarm
+  hosts: managers
+  gather_facts: false
+  vars_files:
+    - group_vars/all/main.yml
+    - group_vars/all/vault.yml
+  roles:
+    - swarm_cluster
+    - wazuh_stack

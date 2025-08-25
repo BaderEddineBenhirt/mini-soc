@@ -1,0 +1,18 @@
+http:
+  middlewares:
+    security-headers:
+      headers:
+        stsSeconds: 31536000
+        stsIncludeSubdomains: true
+        stsPreload: true
+        forceSTSHeader: true
+        contentTypeNosniff: true
+        frameDeny: true
+        referrerPolicy: "no-referrer-when-downgrade"
+        permissionsPolicy: "geolocation=(), microphone=(), camera=()"
+
+tls:
+  options:
+    default:
+      minVersion: VersionTLS12
+      sniStrict: true

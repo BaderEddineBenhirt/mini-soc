@@ -1,0 +1,19 @@
+---
+- name: Ensure Docker is installed
+  package:
+    name: docker.io
+    state: present
+  become: true
+
+- name: Ensure Docker service is running
+  service:
+    name: docker
+    state: started
+    enabled: true
+  become: true
+
+- name: Initialize Swarm if not active (idempotent)
+  community.docker.docker_swarm:
+    state: present
+    advertise_addr: "{{ ansible_host | default(inventory_hostname) }}"
+  become: true

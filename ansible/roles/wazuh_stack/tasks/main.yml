@@ -1,0 +1,74 @@
+---
+- name: Create overlay networks (idempotent)
+  community.docker.docker_network:
+    name: "{{ item }}"
+    driver: overlay
+    attachable: true
+    scope: swarm
+    state: present
+  loop:
+    - "{{ frontend_net }}"
+    - "{{ backend_net }}"
+  become: true
+
+- name: Create named volumes (idempotent)
+  community.docker.docker_volume:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - "{{ vol_indexer_data }}"
+    - "{{ vol_manager_data }}"
+    - "{{ vol_traefik_letsencrypt }}"
+  become: true
+
+# ----- Swarm secrets from Vault -----
+- name: Create secret for Indexer admin password
+  community.docker.docker_secret:
+    name: "{{ secret_indexer_password }}"
+    data: "{{ vault_indexer_admin_password }}"
+    state: present
+  no_log: true
+  become: true
+
+- name: Create secret for Wazuh API password
+  community.docker.docker_secret:
+    name: "{{ secret_api_password }}"
+    data: "{{ vault_wazuh_api_password }}"
+    state: present
+  no_log: true
+  become: true
+
+- name: Create secret for Dashboard admin password
+  community.docker.docker_secret:
+    name: "{{ secret_dashboard_password }}"
+    data: "{{ vault_dashboard_admin_password }}"
+    state: present
+  no_log: true
+  become: true
+
+- name: Create secret for ACME email
+  community.docker.docker_secret:
+    name: "{{ secret_acme_email }}"
+    data: "{{ vault_acme_email }}"
+    state: present
+  no_log: true
+  become: true
+
+# ----- Swarm config for Traefik dynamic TLS/security policy -----
+- name: Create Traefik dynamic config
+  community.docker.docker_config:
+    name: "{{ config_traefik_dynamic }}"
+    data: "{{ lookup('template', 'traefik_dynamic.yml.j2') }}"
+    state: present
+  become: true
+
+# ----- Deploy/Update stack -----
+- name: Deploy/Update Wazuh stack
+  community.docker.docker_stack:
+    state: present
+    name: "{{ project_name }}"
+    compose:
+      - "{{ stack_file }}"
+    with_registry_auth: true
+    prune_services: true
+  become: true

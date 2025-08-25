@@ -1,0 +1,49 @@
+---
+- name: Remove Wazuh mini SOC from Docker Swarm
+  hosts: managers
+  gather_facts: false
+  vars_files:
+    - group_vars/all/main.yml
+  tasks:
+    - name: Remove stack
+      community.docker.docker_stack:
+        state: absent
+        name: "{{ project_name }}"
+      become: true
+
+    - name: Remove networks
+      community.docker.docker_network:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ frontend_net }}"
+        - "{{ backend_net }}"
+      become: true
+
+    - name: Remove secrets
+      community.docker.docker_secret:
+        name: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ secret_indexer_password }}"
+        - "{{ secret_api_password }}"
+        - "{{ secret_dashboard_password }}"
+        - "{{ secret_acme_email }}"
+      become: true
+
+    - name: Remove configs
+      community.docker.docker_config:
+        name: "{{ config_traefik_dynamic }}"
+        state: absent
+      become: true
+
+    # Keep volumes by default to preserve data;
+    # - name: Remove volumes (DANGEROUS: data loss)
+    #   community.docker.docker_volume:
+    #     name: "{{ item }}"
+    #     state: absent
+    #   loop:
+    #     - "{{ vol_indexer_data }}"
+    #     - "{{ vol_manager_data }}"
+    #     - "{{ vol_traefik_letsencrypt }}"
+    #   become: true
