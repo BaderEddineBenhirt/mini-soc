@@ -8,6 +8,8 @@ on:
       - 'mkdocs.yml'
       - 'ansible/**'
       - '.github/workflows/**'
+permissions:
+  contents: write
 jobs:
   build-publish:
     runs-on: ubuntu-latest
