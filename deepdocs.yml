@@ -1,7 +1,6 @@
 # deepdocs.yml
 targets:
-  - path: "docs/"          
-  - path: "README.md"     
+  - path: "docs/" 
 
 branches:
   - main
