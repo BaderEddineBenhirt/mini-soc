@@ -1,9 +1,9 @@
 site_name: Mini SOC
-repo_url: https://github.com/BaderEddineBenhirt/mini-soc.git
+repo_url: https://github.com/<your-username>/<your-repo>
 nav:
   - Home: index.md
   - Architecture: architecture.md
-  - Usage: usage.md
+  - How to Run: usage.md
   - Detection Rules: rules.md
 theme:
   name: material

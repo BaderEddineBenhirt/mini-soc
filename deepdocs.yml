@@ -1,0 +1,13 @@
+# deepdocs.yml
+targets:
+  - path: "docs/"          
+  - path: "README.md"     
+
+branches:
+  - main
+
+ignore:
+  - "docs/_build/**"
+  - ".github/**"
+
+reinit: "v1"
