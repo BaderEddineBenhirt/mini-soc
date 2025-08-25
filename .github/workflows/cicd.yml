@@ -30,6 +30,17 @@ jobs:
         run: ansible-lint -v
       - name: Run yamllint
         run: yamllint .
+      - name: Install Ansible + linters
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ansible
+          pip install ansible-lint yamllint
+
+      - name: Install required Ansible collections
+        run: |
+          ansible-galaxy collection install -r ansible/requirements.yml
+          echo "ANSIBLE_COLLECTIONS_PATHS=$HOME/.ansible/collections:/usr/share/ansible/collections" >> $GITHUB_ENV
+
 
   build:
     name: Build container image (dashboard-extended)
