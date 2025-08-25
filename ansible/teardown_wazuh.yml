@@ -46,4 +46,3 @@
     #     - "{{ vol_manager_data }}"
     #     - "{{ vol_traefik_letsencrypt }}"
     #   become: true
-    
