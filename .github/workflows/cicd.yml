@@ -110,55 +110,6 @@ jobs:
         run: |
           python -m pytest -q tests/selenium/test_dashboard.py --maxfail=1 --disable-warnings
 
-#   deploy:
-#     name: Deploy to Swarm (self-hosted)
-#     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-#     needs: [lint, build, scan, test]
-#     runs-on: self-hosted
-#     env:
-#       SSH_PRIVATE_KEY: ${{ secrets.ANSIBLE_SSH_PRIVATE_KEY }}
-#       SSH_USER:        ${{ secrets.ANSIBLE_SSH_USER }}
-#       SSH_HOST:        ${{ secrets.ANSIBLE_HOST }}
-#       ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
-#     steps:
-#       - uses: actions/checkout@v4
-
-#       - name: Write SSH key
-#         run: |
-#           install -m 700 -d ~/.ssh
-#           printf "%s" "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-#           chmod 600 ~/.ssh/id_rsa
-#           ssh-keyscan -H "$SSH_HOST" >> ~/.ssh/known_hosts
-
-#       - name: Install system deps (Ansible + collections)
-#         run: |
-#           sudo apt-get update -y
-#           sudo apt-get install -y ansible python3-pip
-#           ansible-galaxy collection install community.docker
-
-#       - name: Generate inventory from secrets (optional convenience)
-#         run: |
-#           cat > ansible/inventories/production.yml <<EOF
-#           all:
-#             children:
-#               managers:
-#                 hosts:
-#                   target:
-#                     ansible_host: ${SSH_HOST}
-#                     ansible_user: ${SSH_USER}
-#                     ansible_port: 22
-#                     ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
-#           EOF
-
-#       - name: Write vault pass file
-#         run: |
-#           printf "%s" "$ANSIBLE_VAULT_PASS" > .vault_pass
-#           chmod 600 .vault_pass
-
-#       - name: Deploy
-#         run: |
-#           ansible-playbook -i ansible/inventories/production.yml ansible/deploy_wazuh.yml --vault-password-file .vault_pass
-
   deploy:
     name: Deploy locally on self-hosted runner
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -195,7 +146,8 @@ jobs:
       - name: Deploy (local)
         run: |
           set -o pipefail
-          ansible-playbook -i ansible/inventories/production.yml ansible/deploy_wazuh.yml \
+          ansible-playbook -i ansible/inventories/production.yml\
+            ansible/deploy_wazuh.yml \
             --vault-password-file .vault_pass | tee deploy.log
 
       - name: Upload deploy log
