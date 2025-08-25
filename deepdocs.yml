@@ -1,5 +1,4 @@
 ---
-# Minimal DeepDocs config: edit docs/ and README via PRs
 target:
   - url: "docs/"
   - url: "README.md"

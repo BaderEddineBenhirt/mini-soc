@@ -1,4 +1,4 @@
 ---
-skip_list:
-  - experimental
+exclude_paths:
+  - ansible/group_vars/all/vault.yml
 parseable: true

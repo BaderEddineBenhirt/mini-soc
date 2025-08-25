@@ -3,9 +3,9 @@ name: mini-soc-cicd
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   INDEXER_IMAGE: "wazuh/wazuh-indexer:4.7.2"
@@ -19,17 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - name: Install linters
-        run: |
-          pip install ansible-lint yamllint
-      - name: Run ansible-lint
-        run: ansible-lint -v
-      - name: Run yamllint
-        run: yamllint .
+
       - name: Install Ansible + linters
         run: |
           sudo apt-get update -y
@@ -40,6 +35,12 @@ jobs:
         run: |
           ansible-galaxy collection install -r ansible/requirements.yml
           echo "ANSIBLE_COLLECTIONS_PATHS=$HOME/.ansible/collections:/usr/share/ansible/collections" >> $GITHUB_ENV
+
+      - name: Run yamllint
+        run: yamllint .
+
+      - name: Run ansible-lint
+        run: ansible-lint -v
 
 
   build:

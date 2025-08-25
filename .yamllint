@@ -2,8 +2,15 @@
 extends: default
 
 rules:
-  line-length:
-    max: 140
-    level: warning
-  truthy:
-    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: disable
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true
+  document-start:
+    present: true
+  trailing-spaces: enable
+  new-line-at-end-of-file: enable
