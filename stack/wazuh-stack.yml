@@ -77,11 +77,11 @@ services:
     secrets:
       - source: traefik_acme_email
         target: traefik_acme_email
-        mode: 0400
+        mode: "0400"
     configs:
       - source: traefik_dynamic.yml
         target: /etc/traefik/dynamic/traefik_dynamic.yml
-        mode: 0444
+        mode: "0444"
     deploy:
       <<: *common-deploy
       labels:
@@ -109,7 +109,7 @@ services:
     secrets:
       - source: wazuh_indexer_password
         target: wazuh_indexer_password
-        mode: 0400
+        mode: "0400"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:9200/_cluster/health"]
       interval: 30s
@@ -145,10 +145,10 @@ services:
     secrets:
       - source: wazuh_indexer_password
         target: wazuh_indexer_password
-        mode: 0400
+        mode: "0400"
       - source: wazuh_api_password
         target: wazuh_api_password
-        mode: 0400
+        mode: "0400"
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:55000/"]
       interval: 30s
@@ -188,13 +188,13 @@ services:
     secrets:
       - source: wazuh_indexer_password
         target: wazuh_indexer_password
-        mode: 0400
+        mode: "0400"
       - source: wazuh_api_password
         target: wazuh_api_password
-        mode: 0400
+        mode: "0400"
       - source: wazuh_dashboard_password
         target: wazuh_dashboard_password
-        mode: 0400
+        mode: "0400"
     deploy:
       <<: *common-deploy
       labels:
