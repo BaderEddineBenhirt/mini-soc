@@ -14,7 +14,7 @@
 
 - name: Copy Wazuh stack file
   ansible.builtin.copy:
-    src: "{{ playbook_dir | dirname }}/../..//stack/wazuh-stack.yml"
+    src: "{{ playbook_dir | dirname }}/../../stack/wazuh-stack.yml"
     dest: /opt/stacks/wazuh-stack.yml
     owner: root
     group: root
