@@ -70,8 +70,6 @@
           - certFile: "/letsencrypt/wazuh.crt"
             keyFile: "/letsencrypt/wazuh.key"
 
-
-
 - name: Deploy Wazuh stack (prune unused)
   community.docker.docker_stack:
     state: present
