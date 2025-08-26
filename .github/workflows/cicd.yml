@@ -17,10 +17,6 @@ env:
   TRAEFIK_IMAGE: "traefik:2.11.2"
   WAZUH_HOST: "wazuh.local"
 
-concurrency:
-  group: cicd-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
   lint:
     name: Lint (ansible-lint & yamllint)
@@ -42,8 +38,7 @@ jobs:
           yamllint --version
       - name: Install required Ansible collections
         run: |
-          ansible-galaxy collection install \
-            -r ansible/requirements.yml
+          ansible-galaxy collection install -r ansible/requirements.yml
       - name: Run yamllint
         run: yamllint -s .
       - name: Run ansible-lint
@@ -102,27 +97,38 @@ jobs:
           scan-type: image
           trivy-config: trivy/trivy.yaml
 
-  deploy:
-    name: Deploy locally on self-hosted runner
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+  e2e:
+    name: Deploy + Selenium test on GH runner
     needs: [lint, build, scan]
-    runs-on: [self-hosted, linux, x64]
-    timeout-minutes: 30
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
     env:
       ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
+      TEST_USER: ${{ secrets.TEST_USER }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
-      - name:  runner sanity
-        run: |
-          echo "Runner: $(uname -a)"
-          command -v docker && docker info >/dev/null
-          command -v ansible || true
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Map wazuh.local to 127.0.0.1 (once)
+
+      - name: Map wazuh.local to 127.0.0.1
         run: |
-          if ! grep -q "wazuh.local" /etc/hosts; then
-            echo "127.0.0.1 wazuh.local" | sudo tee -a /etc/hosts
-          fi
+          echo "127.0.0.1 wazuh.local" | sudo tee -a /etc/hosts
+          echo "TEST_URL=https://wazuh.local" >> "$GITHUB_ENV"
+
+      - name: Preflight (docker, kernel tune)
+        run: |
+          docker --version
+          docker info >/dev/null
+          # OpenSearch needs this
+          echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-wazuh.conf
+          sudo sysctl -p /etc/sysctl.d/99-wazuh.conf
+
+      - name: Install Ansible + collections
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ansible python3-pip
+          ansible-galaxy collection install community.docker
+
       - name: Ensure local inventory
         run: |
           mkdir -p ansible/inventories
@@ -134,50 +140,21 @@ jobs:
                   soc-swarm-manager-1:
                     ansible_connection: local
           EOF
-      - name: Install Ansible + collections
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ansible python3-pip
-          ansible-galaxy collection install \
-            community.docker
-      - name: Write vault pass file
+
+      - name: Write vault pass
         run: |
           printf "%s" "$ANSIBLE_VAULT_PASS" > .vault_pass
           chmod 600 .vault_pass
-      - name: Deploy (local)
+
+      - name: Deploy (local on this runner)
         run: |
           set -o pipefail
-          ansible-playbook \
+          ansible-playbook -b \
             -i ansible/inventories/production.yml \
             ansible/deploy_wazuh.yml \
             --vault-password-file .vault_pass | tee deploy.log
-      - name: Upload deploy log
-        uses: actions/upload-artifact@v4
-        with:
-          name: ansible-deploy-log
-          path: deploy.log
 
-  test:
-    name: Selenium UI test (after deploy)
-    runs-on: [self-hosted, linux, x64]
-    needs: deploy
-    timeout-minutes: 20
-    env:
-      TEST_USER: ${{ secrets.TEST_USER }}
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
-    steps:
-      - name: runner sanity
-        run: |
-          echo "Runner: $(uname -a)"
-          command -v docker && docker info >/dev/null
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set TEST_URL from WAZUH_HOST
-        shell: bash
-        run: |
-          echo "TEST_URL=https://${WAZUH_HOST}" >> "$GITHUB_ENV"
-          echo "Using TEST_URL=https://${WAZUH_HOST}"
-      - name: Wait for dashboard to respond (max 90s)
+      - name: Wait for dashboard (max 90s)
         run: |
           for i in $(seq 1 30); do
             if curl -kfsS -o /dev/null -m 3 "${TEST_URL}"; then
@@ -186,19 +163,29 @@ jobs:
             echo "Waiting ${TEST_URL} ... ($i/30)"
             sleep 3
           done
-          echo "Dashboard not reachable at ${TEST_URL}"
           exit 1
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
+
       - name: Install chromedriver
         uses: nanasess/setup-chromedriver@v2
+
       - name: Install test requirements
         run: pip install -r tests/requirements.txt
+
       - name: Run Selenium tests (headless)
         run: |
           python -m pytest -q tests/selenium \
             --maxfail=1 --disable-warnings
+
+      - name: Upload deploy log
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-deploy-log
+          path: deploy.log
