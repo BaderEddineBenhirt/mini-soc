@@ -2,9 +2,6 @@
 - name: Remove Wazuh from Swarm
   hosts: managers
   gather_facts: false
-  collections:
-    - community.docker
-    - ansible.builtin
 
   tasks:
     - name: Remove Wazuh stack

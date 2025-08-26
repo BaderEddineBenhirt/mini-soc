@@ -2,9 +2,6 @@
 - name: Deploy Wazuh on Swarm
   hosts: managers
   gather_facts: false
-  collections:
-    - community.docker
-    - ansible.builtin
 
   vars:
     acme_email: "{{ lookup('env', 'ACME_EMAIL') | default(omit) }}"
