@@ -1,10 +1,19 @@
 ---
-- name: Deploy Wazuh mini SOC to Docker Swarm
+- name: Deploy Wazuh on Swarm
   hosts: managers
   gather_facts: false
-  vars_files:
-    - group_vars/all/main.yml
-    - group_vars/all/vault.yml
+  collections:
+    - community.docker
+    - ansible.builtin
+
+  vars:
+    acme_email: "{{ lookup('env', 'ACME_EMAIL') | default(omit) }}"
+    indexer_password: "{{ lookup('env', 'INDEXER_PASSWORD') | default(omit) }}"
+    wazuh_api_password: "{{ lookup('env', 'WAZUH_API_PASSWORD') | default(omit) }}"
+    dashboard_username: "{{ lookup('env', 'DASHBOARD_USERNAME') | default(omit) }}"
+    dashboard_password: "{{ lookup('env', 'DASHBOARD_PASSWORD') | default(omit) }}"
+    wazuh_host: "{{ lookup('env', 'WAZUH_HOST') | default(omit) }}"
+
   roles:
-    - swarm_cluster
-    - wazuh_stack
+    - role: swarm_cluster
+    - role: wazuh_stack

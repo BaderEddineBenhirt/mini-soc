@@ -1,19 +1,33 @@
 ---
-- name: Ensure Docker is installed
-  package:
-    name: docker.io
+- name: Ensure Docker engine is installed
+  ansible.builtin.package:
+    name:
+      - docker.io
     state: present
-  become: true
 
-- name: Ensure Docker service is running
-  service:
+- name: Ensure Docker service is enabled and running
+  ansible.builtin.service:
     name: docker
     state: started
     enabled: true
-  become: true
 
-- name: Initialize Swarm if not active (idempotent)
+- name: Ensure Docker Swarm is initialized
   community.docker.docker_swarm:
     state: present
     advertise_addr: "{{ ansible_host | default(inventory_hostname) }}"
-  become: true
+
+- name: Ensure overlay network for Wazuh exists
+  community.docker.docker_network:
+    name: wazuh
+    driver: overlay
+    scope: swarm
+    attachable: true
+    state: present
+
+- name: Ensure overlay network for Traefik exists
+  community.docker.docker_network:
+    name: traefik_proxy
+    driver: overlay
+    scope: swarm
+    attachable: true
+    state: present

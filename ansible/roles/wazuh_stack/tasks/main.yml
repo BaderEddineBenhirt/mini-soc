@@ -1,74 +1,40 @@
 ---
-- name: Create overlay networks (idempotent)
-  community.docker.docker_network:
-    name: "{{ item }}"
-    driver: overlay
-    attachable: true
-    scope: swarm
-    state: present
-  loop:
-    - "{{ frontend_net }}"
-    - "{{ backend_net }}"
-  become: true
+- name: Create directory for stacks
+  ansible.builtin.file:
+    path: /opt/stacks
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
-- name: Create named volumes (idempotent)
-  community.docker.docker_volume:
-    name: "{{ item }}"
-    state: present
-  loop:
-    - "{{ vol_indexer_data }}"
-    - "{{ vol_manager_data }}"
-    - "{{ vol_traefik_letsencrypt }}"
-  become: true
+- name: Copy Wazuh stack file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir | dirname }}/../..//stack/wazuh-stack.yml"
+    dest: /opt/stacks/wazuh-stack.yml
+    owner: root
+    group: root
+    mode: "0644"
 
-# ----- Swarm secrets from Vault -----
-- name: Create secret for Indexer admin password
-  community.docker.docker_secret:
-    name: "{{ secret_indexer_password }}"
-    data: "{{ vault_indexer_admin_password }}"
-    state: present
-  no_log: true
-  become: true
+- name: Create Traefik ACME directory
+  ansible.builtin.file:
+    path: /var/lib/traefik
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
-- name: Create secret for Wazuh API password
-  community.docker.docker_secret:
-    name: "{{ secret_api_password }}"
-    data: "{{ vault_wazuh_api_password }}"
-    state: present
-  no_log: true
-  become: true
+- name: Create empty acme.json with strict perms
+  ansible.builtin.copy:
+    dest: /var/lib/traefik/acme.json
+    content: ""
+    owner: root
+    group: root
+    mode: "0400"
 
-- name: Create secret for Dashboard admin password
-  community.docker.docker_secret:
-    name: "{{ secret_dashboard_password }}"
-    data: "{{ vault_dashboard_admin_password }}"
-    state: present
-  no_log: true
-  become: true
-
-- name: Create secret for ACME email
-  community.docker.docker_secret:
-    name: "{{ secret_acme_email }}"
-    data: "{{ vault_acme_email }}"
-    state: present
-  no_log: true
-  become: true
-
-# ----- Swarm config for Traefik dynamic TLS/security policy -----
-- name: Create Traefik dynamic config
-  community.docker.docker_config:
-    name: "{{ config_traefik_dynamic }}"
-    data: "{{ lookup('template', 'traefik_dynamic.yml.j2') }}"
-    state: present
-  become: true
-
-# ----- Deploy/Update stack -----
-- name: Deploy/Update Wazuh stack
+- name: Deploy Wazuh stack (prune unused services)
   community.docker.docker_stack:
     state: present
-    name: "{{ project_name }}"
+    name: wazuh
     compose:
-      - "{{ stack_file }}"
-    with_registry_auth: true
-    prune_services: true
-  become: true
+      - /opt/stacks/wazuh-stack.yml
+    prune: true
