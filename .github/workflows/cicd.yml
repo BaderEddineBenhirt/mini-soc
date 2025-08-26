@@ -37,7 +37,7 @@ jobs:
       - name: Install required Ansible collections
         run: |
           ansible-galaxy collection install -r ansible/requirements.yml
-          echo "ANSIBLE_COLLECTIONS_PATHS=$HOME/.ansible/collections:\
+          echo "ANSIBLE_COLLECTIONS_PATH=$HOME/.ansible/collections:\
           /usr/share/ansible/collections" >> "$GITHUB_ENV"
 
       - name: Run yamllint
