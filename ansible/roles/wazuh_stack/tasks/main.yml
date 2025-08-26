@@ -1,11 +1,16 @@
 ---
-- name: Create directory for stacks
+- name: Ensure stack and Traefik dirs exist
   ansible.builtin.file:
-    path: /opt/stacks
+    path: "{{ item }}"
     state: directory
     owner: root
     group: root
     mode: "0755"
+  loop:
+    - /opt/stacks
+    - /var/lib/traefik
+    - /var/lib/traefik/dynamic
+    - /var/lib/traefik/certs
 
 - name: Copy Wazuh stack file
   ansible.builtin.copy:
@@ -15,26 +20,159 @@
     group: root
     mode: "0644"
 
-- name: Create Traefik ACME directory
-  ansible.builtin.file:
-    path: /var/lib/traefik
-    state: directory
+- name: Set default Wazuh host when not provided
+  ansible.builtin.set_fact:
+    wazuh_host_effective: "{{ wazuh_host | default('wazuh.local') }}"
+
+- name: Generate self-signed private key
+  community.crypto.openssl_privatekey:
+    path: /var/lib/traefik/certs/wazuh.key
+    size: 2048
+    type: RSA
+    mode: "0400"
     owner: root
     group: root
-    mode: "0755"
 
-- name: Create empty acme.json with strict perms
-  ansible.builtin.copy:
-    dest: /var/lib/traefik/acme.json
-    content: ""
+- name: Generate CSR
+  community.crypto.openssl_csr:
+    path: /var/lib/traefik/certs/wazuh.csr
+    privatekey_path: /var/lib/traefik/certs/wazuh.key
+    common_name: "{{ wazuh_host_effective }}"
+    subject_alt_name:
+      - "DNS:{{ wazuh_host_effective }}"
     owner: root
     group: root
     mode: "0400"
 
-- name: Deploy Wazuh stack (prune unused services)
+- name: Generate self-signed certificate
+  community.crypto.openssl_certificate:
+    path: /var/lib/traefik/certs/wazuh.crt
+    privatekey_path: /var/lib/traefik/certs/wazuh.key
+    csr_path: /var/lib/traefik/certs/wazuh.csr
+    provider: selfsigned
+    days: 365
+    owner: root
+    group: root
+    mode: "0444"
+
+- name: Write Traefik dynamic TLS config
+  ansible.builtin.copy:
+    dest: /var/lib/traefik/dynamic/tls.yml
+    mode: "0644"
+    owner: root
+    group: root
+    content: |
+      tls:
+        certificates:
+          - certFile: "/letsencrypt/wazuh.crt"
+            keyFile: "/letsencrypt/wazuh.key"
+
+- name: Deploy Wazuh stack (prune unused)
   community.docker.docker_stack:
     state: present
     name: wazuh
     compose:
       - /opt/stacks/wazuh-stack.yml
     prune: true
+---
+
+- name: Ensure stack and Traefik dirs exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /opt/stacks
+    - /var/lib/traefik
+    - /var/lib/traefik/dynamic
+    - /var/lib/traefik/certs
+
+- name: Copy Wazuh stack file
+  ansible.builtin.copy:
+    src: "{{ playbook_dir | dirname }}/../..//stack/wazuh-stack.yml"
+    dest: /opt/stacks/wazuh-stack.yml
+    owner: root
+    group: root
+    mode: "0644"
+
+
+- name: Set default Wazuh host when not provided
+  ansible.builtin.set_fact:
+    wazuh_host_effective: "{{ wazuh_host | default('wazuh.local') }}"
+
+- name: Generate self-signed private key
+  community.crypto.openssl_privatekey:
+    path: /var/lib/traefik/certs/wazuh.key
+    size: 2048
+    type: RSA
+    mode: "0400"
+    owner: root
+    group: root
+
+- name: Generate CSR
+  community.crypto.openssl_csr:
+    path: /var/lib/traefik/certs/wazuh.csr
+    privatekey_path: /var/lib/traefik/certs/wazuh.key
+    common_name: "{{ wazuh_host_effective }}"
+    subject_alt_name:
+      - "DNS:{{ wazuh_host_effective }}"
+    owner: root
+    group: root
+    mode: "0400"
+
+- name: Generate self-signed certificate
+  community.crypto.openssl_certificate:
+    path: /var/lib/traefik/certs/wazuh.crt
+    privatekey_path: /var/lib/traefik/certs/wazuh.key
+    csr_path: /var/lib/traefik/certs/wazuh.csr
+    provider: selfsigned
+    days: 365
+    owner: root
+    group: root
+    mode: "0444"
+
+- name: Write Traefik dynamic TLS config
+  ansible.builtin.copy:
+    dest: /var/lib/traefik/dynamic/tls.yml
+    mode: "0644"
+    owner: root
+    group: root
+    content: |
+      tls:
+        certificates:
+          - certFile: "/letsencrypt/wazuh.crt"
+            keyFile: "/letsencrypt/wazuh.key"
+
+
+
+- name: Deploy Wazuh stack (prune unused)
+  community.docker.docker_stack:
+    state: present
+    name: wazuh
+    compose:
+      - /opt/stacks/wazuh-stack.yml
+    prune: true
+  environment:
+    INDEXER_PASSWORD: "{{ vault_indexer_admin_password }}"
+    WAZUH_API_PASSWORD: "{{ vault_wazuh_api_password }}"
+    DASHBOARD_PASSWORD: "{{ vault_dashboard_admin_password }}"
+    ACME_EMAIL: "{{ vault_acme_email }}"
+    WAZUH_HOST: "{{ wazuh_host_effective }}"
+
+
+- name: Get a running wazuh-indexer container id
+  ansible.builtin.shell: |
+    docker ps \
+      --filter "name=wazuh-indexer" \
+      --format "{{'{{'}}.ID{{'}}'}}" | head -n 1
+  register: indexer_cid
+  changed_when: false
+
+- name: Ensure dashboard admin password matches vault value
+  ansible.builtin.shell: |
+    docker exec -i {{ indexer_cid.stdout }} bash -lc '
+      /usr/share/wazuh-indexer/plugins/opensearch-security/tools/\
+    wazuh-passwords-tool.sh -u admin -p "{{ vault_dashboard_admin_password }}"'
+  when: indexer_cid.stdout | length > 0

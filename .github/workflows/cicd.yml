@@ -14,6 +14,7 @@ env:
   MANAGER_IMAGE: "wazuh/wazuh-manager:4.7.2"
   DASHBOARD_IMAGE: "wazuh/wazuh-dashboard:4.7.2"
   TRAEFIK_IMAGE: "traefik:2.11.2"
+  WAZUH_HOST: "wazuh.local"
 
 jobs:
   lint:
@@ -33,12 +34,14 @@ jobs:
           sudo apt-get update -y
           sudo apt-get install -y ansible
           pip install ansible-lint yamllint
+          ansible --version
+          ansible-lint --version
+          yamllint --version
 
       - name: Install required Ansible collections
         run: |
-          ansible-galaxy collection install -r ansible/requirements.yml
-          echo "ANSIBLE_COLLECTIONS_PATH=$HOME/.ansible/collections:\
-          /usr/share/ansible/collections" >> "$GITHUB_ENV"
+          ansible-galaxy collection install \
+            -r ansible/requirements.yml
 
       - name: Run yamllint
         run: |
@@ -109,16 +112,91 @@ jobs:
           scan-type: image
           trivy-config: trivy/trivy.yaml
 
-  test:
-    name: Selenium UI test (HTTPS + login form)
-    runs-on: ubuntu-latest
+  deploy:
+    name: Deploy locally on self-hosted runner
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs:
+      - lint
+      - build
+      - scan
+    runs-on: self-hosted
     env:
-      TEST_URL: ${{ secrets.TEST_URL }}
+      ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
+      WAZUH_HOST: ${{ env.WAZUH_HOST }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Map wazuh.local to 127.0.0.1 (once)
+        run: |
+          if ! grep -q "wazuh.local" /etc/hosts; then
+            echo "127.0.0.1 wazuh.local" | sudo tee -a /etc/hosts
+          fi
+
+      - name: Ensure local inventory
+        run: |
+          mkdir -p ansible/inventories
+          cat > ansible/inventories/production.yml <<'EOF'
+          all:
+            children:
+              managers:
+                hosts:
+                  soc-swarm-manager-1:
+                    ansible_connection: local
+          EOF
+
+      - name: Install Ansible + collections
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y ansible python3-pip
+          ansible-galaxy collection install \
+            community.docker community.crypto
+
+      - name: Write vault pass file
+        run: |
+          printf "%s" "$ANSIBLE_VAULT_PASS" > .vault_pass
+          chmod 600 .vault_pass
+
+      - name: Deploy (local)
+        env:
+          WAZUH_HOST: ${{ env.WAZUH_HOST }}
+        run: |
+          set -o pipefail
+          ansible-playbook \
+            -i ansible/inventories/production.yml \
+            ansible/deploy_wazuh.yml \
+            --vault-password-file .vault_pass \
+            | tee deploy.log
+
+      - name: Upload deploy log
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-deploy-log
+          path: deploy.log
+
+  ui_test:
+    name: Selenium UI test (after deploy)
+    runs-on: self-hosted
+    needs: deploy
+    env:
+      TEST_URL: "https://${{ env.WAZUH_HOST }}"
       TEST_USER: ${{ secrets.TEST_USER }}
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Wait for dashboard to respond (max 90s)
+        run: |
+          for i in $(seq 1 30); do
+            if curl -kfsS -o /dev/null -m 3 "${TEST_URL}"; then
+              echo "Dashboard is up at ${TEST_URL}"; exit 0
+            fi
+            echo "Waiting ${TEST_URL} ... ($i/30)"
+            sleep 3
+          done
+          echo "Dashboard not reachable at ${TEST_URL}"
+          exit 1
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -137,59 +215,6 @@ jobs:
 
       - name: Run Selenium tests (headless)
         run: |
-          python -m pytest -q tests/selenium/test_dashboard.py \
+          python -m pytest -q tests/selenium \
             --maxfail=1 \
             --disable-warnings
-
-  deploy:
-    name: Deploy locally on self-hosted runner
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs:
-      - lint
-      - build
-      - scan
-      - test
-    runs-on: self-hosted
-    env:
-      ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Ensure local inventory
-        run: |
-          mkdir -p ansible/inventories
-          cat > ansible/inventories/production.yml <<'EOF'
-          all:
-            children:
-              managers:
-                hosts:
-                  soc-swarm-manager-1:
-                    ansible_connection: local
-          EOF
-
-      - name: Install Ansible + collection
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y ansible python3-pip
-          ansible-galaxy collection install community.docker
-
-      - name: Write vault pass file
-        run: |
-          printf "%s" "$ANSIBLE_VAULT_PASS" > .vault_pass
-          chmod 600 .vault_pass
-
-      - name: Deploy (local)
-        run: |
-          set -o pipefail
-          ansible-playbook \
-            -i ansible/inventories/production.yml \
-            ansible/deploy_wazuh.yml \
-            --vault-password-file .vault_pass \
-            | tee deploy.log
-
-      - name: Upload deploy log
-        uses: actions/upload-artifact@v4
-        with:
-          name: ansible-deploy-log
-          path: deploy.log
