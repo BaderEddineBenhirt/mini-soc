@@ -1,6 +1,4 @@
 ---
-
-
 - name: Ensure stack and Traefik dirs exist
   ansible.builtin.file:
     path: "{{ item }}"
@@ -21,7 +19,6 @@
     owner: root
     group: root
     mode: "0644"
-
 
 - name: Set default Wazuh host when not provided
   ansible.builtin.set_fact:
@@ -83,7 +80,6 @@
     DASHBOARD_PASSWORD: "{{ vault_dashboard_admin_password }}"
     ACME_EMAIL: "{{ vault_acme_email }}"
     WAZUH_HOST: "{{ wazuh_host_effective }}"
-
 
 - name: Get a running wazuh-indexer container id
   ansible.builtin.shell: |
