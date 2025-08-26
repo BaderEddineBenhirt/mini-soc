@@ -1,11 +1,13 @@
 ---
 name: mini-soc-cicd
 
-on:
+'on':
   push:
-    branches: ["main"]
+    branches:
+      - main
   pull_request:
-    branches: ["main"]
+    branches:
+      - main
 
 env:
   INDEXER_IMAGE: "wazuh/wazuh-indexer:4.7.2"
@@ -18,7 +20,8 @@ jobs:
     name: Lint (ansible-lint & yamllint)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -34,26 +37,37 @@ jobs:
       - name: Install required Ansible collections
         run: |
           ansible-galaxy collection install -r ansible/requirements.yml
-          echo "ANSIBLE_COLLECTIONS_PATHS=$HOME/.ansible/collections:/usr/share/ansible/collections" >> $GITHUB_ENV
+          echo "ANSIBLE_COLLECTIONS_PATHS=$HOME/.ansible/collections:\
+          /usr/share/ansible/collections" >> "$GITHUB_ENV"
 
       - name: Run yamllint
-        run: yamllint .
+        run: |
+          yamllint -s .
 
       - name: Run ansible-lint
-        run: ansible-lint -v
-
+        run: |
+          ansible-lint -v
 
   build:
     name: Build container image (dashboard-extended)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Build image
         run: |
-          docker build -t local/wazuh-dashboard-extended:4.7.2 -f docker/Dockerfile.wazuh-dashboard-extended .
+          docker build \
+            -t local/wazuh-dashboard-extended:4.7.2 \
+            -f docker/Dockerfile.wazuh-dashboard-extended \
+            .
+
       - name: Save image as artifact (optional)
         run: |
-          docker save local/wazuh-dashboard-extended:4.7.2 | gzip > dashboard-extended-4.7.2.tar.gz
+          docker save local/wazuh-dashboard-extended:4.7.2 \
+            | gzip \
+            > dashboard-extended-4.7.2.tar.gz
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -64,23 +78,32 @@ jobs:
     name: Trivy scan (fail on HIGH/CRITICAL)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.24.0
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trivy indexer
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.INDEXER_IMAGE }}
           scan-type: image
           trivy-config: trivy/trivy.yaml
-      - uses: aquasecurity/trivy-action@0.24.0
+
+      - name: Trivy manager
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.MANAGER_IMAGE }}
           scan-type: image
           trivy-config: trivy/trivy.yaml
-      - uses: aquasecurity/trivy-action@0.24.0
+
+      - name: Trivy dashboard
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.DASHBOARD_IMAGE }}
           scan-type: image
           trivy-config: trivy/trivy.yaml
-      - uses: aquasecurity/trivy-action@0.24.0
+
+      - name: Trivy traefik
+        uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.TRAEFIK_IMAGE }}
           scan-type: image
@@ -90,35 +113,48 @@ jobs:
     name: Selenium UI test (HTTPS + login form)
     runs-on: ubuntu-latest
     env:
-      TEST_URL: ${{ secrets.TEST_URL }}           
-      TEST_USER: ${{ secrets.TEST_USER }}         
-      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}  
+      TEST_URL: ${{ secrets.TEST_URL }}
+      TEST_USER: ${{ secrets.TEST_USER }}
+      TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
+
       - name: Install chromedriver
         uses: nanasess/setup-chromedriver@v2
+
       - name: Install test requirements
         run: |
           pip install -r tests/requirements.txt
+
       - name: Run Selenium tests (headless)
         run: |
-          python -m pytest -q tests/selenium/test_dashboard.py --maxfail=1 --disable-warnings
+          python -m pytest -q tests/selenium/test_dashboard.py \
+            --maxfail=1 \
+            --disable-warnings
 
   deploy:
     name: Deploy locally on self-hosted runner
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [lint, build, scan, test]
+    needs:
+      - lint
+      - build
+      - scan
+      - test
     runs-on: self-hosted
     env:
       ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Ensure local inventory
         run: |
@@ -146,9 +182,11 @@ jobs:
       - name: Deploy (local)
         run: |
           set -o pipefail
-          ansible-playbook -i ansible/inventories/production.yml\
+          ansible-playbook \
+            -i ansible/inventories/production.yml \
             ansible/deploy_wazuh.yml \
-            --vault-password-file .vault_pass | tee deploy.log
+            --vault-password-file .vault_pass \
+            | tee deploy.log
 
       - name: Upload deploy log
         uses: actions/upload-artifact@v4

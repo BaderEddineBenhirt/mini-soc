@@ -158,7 +158,7 @@ services:
       - "DASHBOARD_USERNAME=admin"
       - "DASHBOARD_PASSWORD_FILE=/run/secrets/wazuh_dashboard_password"
       - "WAZUH_API_URL=http://wazuh-manager:55000"
-      - "WAZUH_API_USERNAME={{ vault_wazuh_api_username }}"
+      - "WAZUH_API_USERNAME={{ vault_wazuh_api_username | default('wazuh-api') }}"
       - "WAZUH_API_PASSWORD_FILE=/run/secrets/wazuh_api_password"
     command: >-
       sh -c '
