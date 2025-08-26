@@ -8,6 +8,7 @@ name: mini-soc-cicd
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 env:
   INDEXER_IMAGE: "wazuh/wazuh-indexer:4.7.2"
@@ -16,6 +17,10 @@ env:
   TRAEFIK_IMAGE: "traefik:2.11.2"
   WAZUH_HOST: "wazuh.local"
 
+concurrency:
+  group: cicd-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   lint:
     name: Lint (ansible-lint & yamllint)
@@ -23,12 +28,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install Ansible + linters
         run: |
           sudo apt-get update -y
@@ -37,19 +40,14 @@ jobs:
           ansible --version
           ansible-lint --version
           yamllint --version
-
       - name: Install required Ansible collections
         run: |
           ansible-galaxy collection install \
             -r ansible/requirements.yml
-
       - name: Run yamllint
-        run: |
-          yamllint -s .
-
+        run: yamllint -s .
       - name: Run ansible-lint
-        run: |
-          ansible-lint -v
+        run: ansible-lint -v
 
   build:
     name: Build container image (dashboard-extended)
@@ -57,20 +55,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Build image
         run: |
           docker build \
             -t local/wazuh-dashboard-extended:4.7.2 \
             -f docker/Dockerfile.wazuh-dashboard-extended \
             .
-
       - name: Save image as artifact (optional)
         run: |
           docker save local/wazuh-dashboard-extended:4.7.2 \
-            | gzip \
-            > dashboard-extended-4.7.2.tar.gz
-
+            | gzip > dashboard-extended-4.7.2.tar.gz
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
@@ -78,33 +72,29 @@ jobs:
           path: dashboard-extended-4.7.2.tar.gz
 
   scan:
-    name: Trivy scan (fail on HIGH/CRITICAL)
+    name: Trivy scan (report only)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Trivy indexer
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.INDEXER_IMAGE }}
           scan-type: image
           trivy-config: trivy/trivy.yaml
-
       - name: Trivy manager
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.MANAGER_IMAGE }}
           scan-type: image
           trivy-config: trivy/trivy.yaml
-
       - name: Trivy dashboard
         uses: aquasecurity/trivy-action@0.24.0
         with:
           image-ref: ${{ env.DASHBOARD_IMAGE }}
           scan-type: image
           trivy-config: trivy/trivy.yaml
-
       - name: Trivy traefik
         uses: aquasecurity/trivy-action@0.24.0
         with:
@@ -115,23 +105,24 @@ jobs:
   deploy:
     name: Deploy locally on self-hosted runner
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs:
-      - lint
-      - build
-      - scan
-    runs-on: self-hosted
+    needs: [lint, build, scan]
+    runs-on: [self-hosted, linux, x64]
+    timeout-minutes: 30
     env:
       ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
     steps:
+      - name:  runner sanity
+        run: |
+          echo "Runner: $(uname -a)"
+          command -v docker && docker info >/dev/null
+          command -v ansible || true
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Map wazuh.local to 127.0.0.1 (once)
         run: |
           if ! grep -q "wazuh.local" /etc/hosts; then
             echo "127.0.0.1 wazuh.local" | sudo tee -a /etc/hosts
           fi
-
       - name: Ensure local inventory
         run: |
           mkdir -p ansible/inventories
@@ -143,28 +134,23 @@ jobs:
                   soc-swarm-manager-1:
                     ansible_connection: local
           EOF
-
       - name: Install Ansible + collections
         run: |
           sudo apt-get update -y
           sudo apt-get install -y ansible python3-pip
           ansible-galaxy collection install \
-            community.docker community.crypto
-
+            community.docker
       - name: Write vault pass file
         run: |
           printf "%s" "$ANSIBLE_VAULT_PASS" > .vault_pass
           chmod 600 .vault_pass
-
       - name: Deploy (local)
         run: |
           set -o pipefail
           ansible-playbook \
             -i ansible/inventories/production.yml \
             ansible/deploy_wazuh.yml \
-            --vault-password-file .vault_pass \
-            | tee deploy.log
-
+            --vault-password-file .vault_pass | tee deploy.log
       - name: Upload deploy log
         uses: actions/upload-artifact@v4
         with:
@@ -173,21 +159,24 @@ jobs:
 
   test:
     name: Selenium UI test (after deploy)
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, x64]
     needs: deploy
+    timeout-minutes: 20
     env:
       TEST_USER: ${{ secrets.TEST_USER }}
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
+      - name: runner sanity
+        run: |
+          echo "Runner: $(uname -a)"
+          command -v docker && docker info >/dev/null
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set TEST_URL from WAZUH_HOST
         shell: bash
         run: |
           echo "TEST_URL=https://${WAZUH_HOST}" >> "$GITHUB_ENV"
           echo "Using TEST_URL=https://${WAZUH_HOST}"
-
       - name: Wait for dashboard to respond (max 90s)
         run: |
           for i in $(seq 1 30); do
@@ -199,24 +188,17 @@ jobs:
           done
           echo "Dashboard not reachable at ${TEST_URL}"
           exit 1
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-
       - name: Install Chrome
         uses: browser-actions/setup-chrome@v1
-
       - name: Install chromedriver
         uses: nanasess/setup-chromedriver@v2
-
       - name: Install test requirements
-        run: |
-          pip install -r tests/requirements.txt
-
+        run: pip install -r tests/requirements.txt
       - name: Run Selenium tests (headless)
         run: |
           python -m pytest -q tests/selenium \
-            --maxfail=1 \
-            --disable-warnings
+            --maxfail=1 --disable-warnings
