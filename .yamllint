@@ -1,6 +1,7 @@
 ---
 extends: default
-
+ignore: |
+  ansible/group_vars/all/vault.yml
 rules:
   comments:
     min-spaces-from-content: 1
