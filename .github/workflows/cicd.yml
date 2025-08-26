@@ -143,8 +143,16 @@ jobs:
 
       - name: Write vault pass
         run: |
-          printf "%s" "$ANSIBLE_VAULT_PASS" > .vault_pass
+          # write the secret and strip any Windows CR characters
+          printf '%s' "$ANSIBLE_VAULT_PASS" | tr -d '\r' > .vault_pass
           chmod 600 .vault_pass
+
+          # fail fast if decryption doesn't work (no secrets printed)
+          if ! ansible-vault view ansible/group_vars/all/vault.yml \
+               --vault-password-file .vault_pass >/dev/null 2>&1; then
+            echo 'Vault decryption FAILED. Check ANSIBLE_VAULT_PASS.' >&2
+            exit 1
+          fi
 
       - name: Deploy (local on this runner)
         run: |
