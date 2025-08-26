@@ -174,5 +174,5 @@
   ansible.builtin.shell: |
     docker exec -i {{ indexer_cid.stdout }} bash -lc '
       /usr/share/wazuh-indexer/plugins/opensearch-security/tools/\
-      wazuh-passwords-tool.sh -u admin -p "{{ vault_dashboard_admin_password }}"'
+    wazuh-passwords-tool.sh -u admin -p "{{ vault_dashboard_admin_password }}"'
   when: indexer_cid.stdout | length > 0

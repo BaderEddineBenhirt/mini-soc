@@ -122,7 +122,6 @@ jobs:
     runs-on: self-hosted
     env:
       ANSIBLE_VAULT_PASS: ${{ secrets.ANSIBLE_VAULT_PASS }}
-      WAZUH_HOST: ${{ env.WAZUH_HOST }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -158,8 +157,6 @@ jobs:
           chmod 600 .vault_pass
 
       - name: Deploy (local)
-        env:
-          WAZUH_HOST: ${{ env.WAZUH_HOST }}
         run: |
           set -o pipefail
           ansible-playbook \
@@ -179,12 +176,17 @@ jobs:
     runs-on: self-hosted
     needs: deploy
     env:
-      TEST_URL: "https://${{ env.WAZUH_HOST }}"
       TEST_USER: ${{ secrets.TEST_USER }}
       TEST_PASSWORD: ${{ secrets.TEST_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set TEST_URL from WAZUH_HOST
+        shell: bash
+        run: |
+          echo "TEST_URL=https://${WAZUH_HOST}" >> "$GITHUB_ENV"
+          echo "Using TEST_URL=${WAZUH_HOST}"
 
       - name: Wait for dashboard to respond (max 90s)
         run: |
