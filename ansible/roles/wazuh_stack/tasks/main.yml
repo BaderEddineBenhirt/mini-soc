@@ -1,16 +1,11 @@
 ---
-- name: Ensure stack and Traefik dirs exist
+- name: Create directory for stacks
   ansible.builtin.file:
-    path: "{{ item }}"
+    path: /opt/stacks
     state: directory
     owner: root
     group: root
     mode: "0755"
-  loop:
-    - /opt/stacks
-    - /var/lib/traefik
-    - /var/lib/traefik/dynamic
-    - /var/lib/traefik/certs
 
 - name: Copy Wazuh stack file
   ansible.builtin.copy:
@@ -20,28 +15,38 @@
     group: root
     mode: "0644"
 
-- name: Resolve effective secrets and host
-  ansible.builtin.set_fact:
-    indexer_password_effective: >-
-      {{ vault_indexer_admin_password
-         | default(lookup('env', 'INDEXER_PASSWORD'), true) }}
-    wazuh_api_password_effective: >-
-      {{ vault_wazuh_api_password
-         | default(lookup('env', 'WAZUH_API_PASSWORD'), true) }}
-    dashboard_password_effective: >-
-      {{ vault_dashboard_admin_password
-         | default(lookup('env', 'DASHBOARD_PASSWORD'), true) }}
-    acme_email_effective: >-
-      {{ vault_acme_email
-         | default(lookup('env', 'ACME_EMAIL'), true) }}
-    wazuh_host_effective: >-
-      {{ wazuh_domain
-         | default(lookup('env', 'WAZUH_HOST') | default('wazuh.local')) }}
+- name: Create Traefik state directory
+  ansible.builtin.file:
+    path: /var/lib/traefik
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
 
-- name: Deploy Wazuh stack (prune unused)
+- name: Create empty acme.json with strict perms
+  ansible.builtin.copy:
+    dest: /var/lib/traefik/acme.json
+    content: ""
+    owner: root
+    group: root
+    mode: "0400"
+
+- name: Deploy Wazuh stack (prune unused services)
   community.docker.docker_stack:
     state: present
     name: wazuh
     compose:
       - /opt/stacks/wazuh-stack.yml
     prune: true
+  environment:
+    INDEXER_PASSWORD: "{{ vault_indexer_admin_password \
+      | default(lookup('env','INDEXER_PASSWORD'), true) }}"
+    WAZUH_API_PASSWORD: "{{ vault_wazuh_api_password \
+      | default(lookup('env','WAZUH_API_PASSWORD'), true) }}"
+    DASHBOARD_PASSWORD: "{{ vault_dashboard_admin_password \
+      | default(lookup('env','DASHBOARD_PASSWORD'), true) }}"
+    ACME_EMAIL: "{{ vault_acme_email \
+      | default(lookup('env','ACME_EMAIL'), true) }}"
+    WAZUH_HOST: "{{ wazuh_domain \
+      | default(lookup('env','WAZUH_HOST') \
+      | default('wazuh.local')) }}"
