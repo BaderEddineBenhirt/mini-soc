@@ -1,7 +1,7 @@
 ---
 - name: Check if Docker is available
   ansible.builtin.command: docker info
-  register: docker_info
+  register: swarm_cluster_docker_info
   changed_when: false
   failed_when: false
 
@@ -10,7 +10,7 @@
     name: docker.io
     state: present
     update_cache: true
-  when: docker_info.rc != 0
+  when: swarm_cluster_docker_info.rc != 0
 
 - name: Ensure Docker service is running
   ansible.builtin.service:
