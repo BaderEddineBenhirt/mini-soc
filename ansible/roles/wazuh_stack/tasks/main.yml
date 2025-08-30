@@ -39,14 +39,19 @@
       - /opt/stacks/wazuh-stack.yml
     prune: true
   environment:
-    INDEXER_PASSWORD: "{{ vault_indexer_admin_password \
-      | default(lookup('env','INDEXER_PASSWORD'), true) }}"
-    WAZUH_API_PASSWORD: "{{ vault_wazuh_api_password \
-      | default(lookup('env','WAZUH_API_PASSWORD'), true) }}"
-    DASHBOARD_PASSWORD: "{{ vault_dashboard_admin_password \
-      | default(lookup('env','DASHBOARD_PASSWORD'), true) }}"
-    ACME_EMAIL: "{{ vault_acme_email \
-      | default(lookup('env','ACME_EMAIL'), true) }}"
-    WAZUH_HOST: "{{ wazuh_domain \
-      | default(lookup('env','WAZUH_HOST') \
-      | default('wazuh.local')) }}"
+    INDEXER_PASSWORD: >-
+      {{ vault_indexer_admin_password
+         | default(lookup('env', 'INDEXER_PASSWORD'), true) }}
+    WAZUH_API_PASSWORD: >-
+      {{ vault_wazuh_api_password
+         | default(lookup('env', 'WAZUH_API_PASSWORD'), true) }}
+    DASHBOARD_PASSWORD: >-
+      {{ vault_dashboard_admin_password
+         | default(lookup('env', 'DASHBOARD_PASSWORD'), true) }}
+    ACME_EMAIL: >-
+      {{ vault_acme_email
+         | default(lookup('env', 'ACME_EMAIL'), true) }}
+    WAZUH_HOST: >-
+      {{ wazuh_domain
+         | default((lookup('env', 'WAZUH_HOST')
+         | default('wazuh.local'))) }}
